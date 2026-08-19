@@ -2,114 +2,35 @@
 
 declare(strict_types=1);
 
-namespace App\Controllers;
+namespace App\Interfaces;
 
-use App\Interfaces\UserRepositoryInterface;
-use Core\View;
-use Exceptions\ValidationException;
+use App\Models\User;
 
-class UserController extends Controller
+interface UserRepositoryInterface
 {
-    public function __construct(private UserRepositoryInterface $users) {}
+    /** @return User[] */
+    public function all(): array;
 
-    public function index(): string
-    {
-        $term = trim((string) $this->value('q', ''));
-        $users = $term === '' ? $this->users->all() : $this->users->search($term);
+    public function findById(int $id): ?User;
 
-        return View::render('users/index', [
-            'title'  => 'Utilisateurs',
-            'users'  => $users,
-            'term'   => $term,
-        ]);
-    }
+    public function findByEmail(string $email): ?User;
 
-    public function create(): string
-    {
-        return View::render('users/create', [
-            'title' => 'Nouvel utilisateur',
-            'roles' => $this->users->roles(),
-        ]);
-    }
+    /** @return User[] */
+    public function search(string $term): array;
 
-    public function store(): never
-    {
-        try {
-            $this->validateInput();
+    public function create(array $data): User;
 
-            $this->users->create([
-                'nom'       => trim((string) $this->value('nom')),
-                'prenom'    => trim((string) $this->value('prenom')),
-                'email'     => trim((string) $this->value('email')),
-                'password'  => password_hash((string) $this->value('password'), PASSWORD_DEFAULT),
-                'telephone' => $this->value('telephone') ?: null,
-                'role_id'   => (int) $this->value('role_id'),
-            ]);
+    public function update(int $id, array $data): void;
 
-            flash('success', 'Utilisateur créé avec succès.');
-            View::redirect('/users');
-        } catch (ValidationException $e) {
-            flash('error', $e->getMessage());
-            View::redirectBack('/users/create');
-        }
-    }
+    public function updatePassword(int $id, string $password): void;
 
-    public function edit(int $id): string
-    {
-        $user = $this->users->findById($id);
+    public function delete(int $id): void;
 
-        if ($user === null) {
-            http_response_code(404);
-            return View::render('errors/404', ['title' => 'Utilisateur introuvable'], null);
-        }
+    public function count(): int;
 
-        return View::render('users/edit', [
-            'title' => 'Modifier un utilisateur',
-            'user'  => $user,
-            'roles' => $this->users->roles(),
-        ]);
-    }
+    /** @return array{id: int, libelle: string}[] */
+    public function roles(): array;
 
-    public function update(int $id): never
-    {
-        try {
-            $this->validateInput();
-
-            $this->users->update($id, [
-                'nom'       => trim((string) $this->value('nom')),
-                'prenom'    => trim((string) $this->value('prenom')),
-                'email'     => trim((string) $this->value('email')),
-                'telephone' => $this->value('telephone') ?: null,
-                'role_id'   => (int) $this->value('role_id'),
-            ]);
-
-            $password = (string) $this->value('password', '');
-            if ($password !== '') {
-                $this->users->updatePassword($id, $password);
-            }
-
-            flash('success', 'Utilisateur modifié avec succès.');
-            View::redirect('/users');
-        } catch (ValidationException $e) {
-            flash('error', $e->getMessage());
-            View::redirectBack('/users/' . $id . '/edit');
-        }
-    }
-
-    public function delete(int $id): never
-    {
-        $this->users->delete($id);
-        flash('success', 'Utilisateur supprimé.');
-        View::redirect('/users');
-    }
-
-    private function validateInput(): void
-    {
-        if (trim((string) $this->value('nom')) === '' || trim((string) $this->value('prenom')) === '') {
-            throw new ValidationException('Le nom et le prénom sont obligatoires.');
-        }
-        if (!filter_var((string) $this->value('email'), FILTER_VALIDATE_EMAIL)) {
-            throw new ValidationException("L'adresse e-mail est invalide.");
-        }
-    }
+    /** @return User[] */
+    public function mostActive(int $limit = 5): array;
 }
